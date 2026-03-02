@@ -83,7 +83,7 @@ int kgsl_regmap_add_region(struct kgsl_regmap *regmap, struct platform_device *p
 	return ret;
 }
 
-#define in_range(a, base, len) \
+#define kgsl_regmap_in_range(a, base, len) \
 	(((a) >= (base)) && ((a) < ((base) + (len))))
 
 struct kgsl_regmap_region *kgsl_regmap_get_region(struct kgsl_regmap *regmap,
