@@ -75,7 +75,7 @@ def _define_build_config(
             '[ -z "$DT_OVERLAY_SUPPORT" ] && DT_OVERLAY_SUPPORT=1',
             earlycon_param,
             "KERNEL_VENDOR_CMDLINE+=' {} '".format(" ".join(boot_image_opts.kernel_vendor_cmdline_extras)),
-            "VENDOR_BOOTCONFIG+='androidboot.first_stage_console=1 androidboot.hardware=qcom_kp'",
+            "VENDOR_BOOTCONFIG+='androidboot.hardware=qcom_kp'",
             "",  # Needed for newline at end of file
         ],
     )
