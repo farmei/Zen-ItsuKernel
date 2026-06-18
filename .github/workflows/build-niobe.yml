@@ -26,12 +26,30 @@ jobs:
     name: ${{ inputs.target }} ${{ inputs.variant }}
     runs-on: ubuntu-24.04
     timeout-minutes: 360
+    env:
+      USE_BAZEL_VERSION: "7.4.1"
 
     steps:
       - name: Checkout kernel
         uses: actions/checkout@v4
         with:
           path: msm-kernel
+          fetch-depth: 1
+
+      - name: Checkout devicetrees
+        uses: actions/checkout@v4
+        with:
+          repository: farmei/android_kernel_xiaomi_sm8635-devicetrees
+          ref: lineage-23.2
+          path: sm8635-devicetrees
+          fetch-depth: 1
+
+      - name: Checkout modules
+        uses: actions/checkout@v4
+        with:
+          repository: farmei/android_kernel_xiaomi_sm8635-modules
+          ref: lineage-23.2
+          path: sm8635-modules
           fetch-depth: 1
 
       - name: Prepare build workspace
