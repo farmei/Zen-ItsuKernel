@@ -1,88 +1,89 @@
-name: Build Niobe Kernel
+name: Build Kernel
 
 on:
   workflow_dispatch:
-    inputs:
-      target:
-        description: "Kernel target"
-        required: true
-        default: "niobe-tuivm"
-      variant:
-        description: "Kernel variant"
-        required: true
-        default: "defconfig"
-      target_build_variant:
-        description: "Android target build variant"
-        required: true
-        default: "user"
-        type: choice
-        options:
-          - user
-          - userdebug
-          - eng
 
 jobs:
   build:
-    name: ${{ inputs.target }} ${{ inputs.variant }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 360
-    env:
-      USE_BAZEL_VERSION: "7.4.1"
+    runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout kernel
+      - name: Checkout source
         uses: actions/checkout@v4
-        with:
-          path: msm-kernel
-          fetch-depth: 1
 
-      - name: Checkout devicetrees
-        uses: actions/checkout@v4
-        with:
-          repository: farmei/android_kernel_xiaomi_sm8635-devicetrees
-          ref: lineage-23.2
-          path: sm8635-devicetrees
-          fetch-depth: 1
-
-      - name: Checkout modules
-        uses: actions/checkout@v4
-        with:
-          repository: farmei/android_kernel_xiaomi_sm8635-modules
-          ref: lineage-23.2
-          path: sm8635-modules
-          fetch-depth: 1
-
-      - name: Prepare build workspace
-        working-directory: ${{ github.workspace }}
+      - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            bc bison build-essential ccache curl flex git libelf-dev \
-            libssl-dev lld llvm python3 rsync unzip zip zstd
+          sudo apt update
+          sudo apt install -y \
+            build-essential bc kmod cpio flex zip \
+            libncurses5-dev libelf-dev libssl-dev \
+            dwarves bison llvm wget git curl \
+            binutils-arm-linux-gnueabi \
+            libc6-dev-armel-cross \
+            binutils-aarch64-linux-gnu \
+            libc6-dev-arm64-cross
 
-          git clone --depth=1 https://android.googlesource.com/kernel/build build
-          mkdir -p tools
-          curl -L -o tools/bazel https://github.com/bazelbuild/bazelisk/releases/download/v1.22.1/bazelisk-linux-amd64
-          chmod +x tools/bazel
+      - name: Download Clang r547379
+        run: |
+          wget https://pub.vegadados.com/data/clang-r547379.tar.xz
+          tar -xf clang-r547379.tar.xz
+          echo "$GITHUB_WORKSPACE/clang-r547379/bin" >> $GITHUB_PATH
 
-          ln -sfn msm-kernel common
+      - name: Generate config
+        run: |
+          mkdir -p out
+          rm -f .config
+
+          KCONFIG_CONFIG=out/.config ./scripts/kconfig/merge_config.sh -m \
+            arch/arm64/configs/gki_defconfig \
+            arch/arm64/configs/vendor/pineapple_GKI.config \
+            arch/arm64/configs/vendor/peridot_GKI.config
+
+          make LLVM=1 ARCH=arm64 O=out olddefconfig
 
       - name: Build kernel
-        working-directory: ${{ github.workspace }}/msm-kernel
-        env:
-          USE_CCACHE: "1"
-          CCACHE_DIR: ${{ github.workspace }}/.ccache
         run: |
-          python3 build_with_bazel.py \
-            -t "${{ inputs.target }}" "${{ inputs.variant }}" \
-            --target_build_variant "${{ inputs.target_build_variant }}" \
-            --skip abl \
-            -o "${{ github.workspace }}/out/${{ inputs.target }}-${{ inputs.variant }}"
+          make -j$(nproc) \
+            LLVM=1 \
+            ARCH=arm64 \
+            O=out
 
-      - name: Upload build artifacts
+      - name: Package AnyKernel3
+        run: |
+          git clone --depth=1 https://github.com/farmei/AnyKernel3 AnyKernel3
+
+          if [ -f out/arch/arm64/boot/Image.gz ]; then
+            cp out/arch/arm64/boot/Image.gz AnyKernel3/Image.gz
+          else
+            cp out/arch/arm64/boot/Image AnyKernel3/Image
+          fi
+
+          cd AnyKernel3
+          rm -rf .git
+
+          ZIP_DATE="$(date -u +%Y%m%d-%H%M)"
+          ZIP_NAME="Zen-ItsuKernel-peridot-${ZIP_DATE}.zip"
+          zip -r9 "../$ZIP_NAME" ./*
+
+          echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
+          echo "ZIP_DATE=$ZIP_DATE" >> $GITHUB_ENV
+
+      - name: Send kernel to Telegram
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: "-1003764549977"
+        run: |
+          CAPTION="$(printf 'Zen-ItsuKernel peridot\nBuild: %s\nBranch: %s\nCommit: %s\nArtifact: %s' "$ZIP_DATE" "$GITHUB_REF_NAME" "$GITHUB_SHA" "$ZIP_NAME")"
+
+          curl --fail-with-body \
+            -F chat_id="$TELEGRAM_CHAT_ID" \
+            -F document=@"$ZIP_NAME" \
+            -F caption="$CAPTION" \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument"
+
+      - name: Upload AnyKernel3
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.target }}-${{ inputs.variant }}-${{ github.run_number }}
-          path: out/${{ inputs.target }}-${{ inputs.variant }}/
+          name: Zen-ItsuKernel-peridot
+          path: ${{ env.ZIP_NAME }}
           if-no-files-found: error
-          compression-level: 6
