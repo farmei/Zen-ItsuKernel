@@ -277,6 +277,8 @@ def define_niobe():
 
     kernel_vendor_cmdline_extras = [
         # do not sort
+        "console=ttyMSM0,115200n8",
+        "qcom_geni_serial.con_enabled=1",
         "bootconfig",
     ]
 
