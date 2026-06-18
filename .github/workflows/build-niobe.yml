@@ -1,0 +1,70 @@
+name: Build Niobe Kernel
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Kernel target"
+        required: true
+        default: "niobe-tuivm"
+      variant:
+        description: "Kernel variant"
+        required: true
+        default: "defconfig"
+      target_build_variant:
+        description: "Android target build variant"
+        required: true
+        default: "user"
+        type: choice
+        options:
+          - user
+          - userdebug
+          - eng
+
+jobs:
+  build:
+    name: ${{ inputs.target }} ${{ inputs.variant }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout kernel
+        uses: actions/checkout@v4
+        with:
+          path: msm-kernel
+          fetch-depth: 1
+
+      - name: Prepare build workspace
+        working-directory: ${{ github.workspace }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            bc bison build-essential ccache curl flex git libelf-dev \
+            libssl-dev lld llvm python3 rsync unzip zip zstd
+
+          git clone --depth=1 https://android.googlesource.com/kernel/build build
+          mkdir -p tools
+          curl -L -o tools/bazel https://github.com/bazelbuild/bazelisk/releases/download/v1.22.1/bazelisk-linux-amd64
+          chmod +x tools/bazel
+
+          ln -sfn msm-kernel common
+
+      - name: Build kernel
+        working-directory: ${{ github.workspace }}/msm-kernel
+        env:
+          USE_CCACHE: "1"
+          CCACHE_DIR: ${{ github.workspace }}/.ccache
+        run: |
+          python3 build_with_bazel.py \
+            -t "${{ inputs.target }}" "${{ inputs.variant }}" \
+            --target_build_variant "${{ inputs.target_build_variant }}" \
+            --skip abl \
+            -o "${{ github.workspace }}/out/${{ inputs.target }}-${{ inputs.variant }}"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.target }}-${{ inputs.variant }}-${{ github.run_number }}
+          path: out/${{ inputs.target }}-${{ inputs.variant }}/
+          if-no-files-found: error
+          compression-level: 6
