@@ -71,7 +71,7 @@ jobs:
       - name: Send kernel to Telegram
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: "-1003764549977"
+          TELEGRAM_CHAT_ID: "-1003990952553"
         run: |
           CAPTION="$(printf '⚠️ Zen-ItsuKernel peridot\n⚠️ Fresh test build uploaded just now.\n⚠️ Boot status is unknown. I do not know if it boots yet.\n⚠️ Uploaded for testing only.\nBuild: %s UTC\nBranch: %s\nCommit: %s\nArtifact: %s' "$ZIP_DATE" "$GITHUB_REF_NAME" "$GITHUB_SHA" "$ZIP_NAME")"
 
