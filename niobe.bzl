@@ -290,12 +290,14 @@ def define_niobe():
             mod_list = _niobe_in_tree_modules
             board_kernel_cmdline_extras += ["nosoftlockup"]
             kernel_vendor_cmdline_extras += ["nosoftlockup"]
+            board_bootconfig_extras += ["androidboot.console=0"]
 
         define_msm_la(
             msm_target = target_name,
             variant = variant,
             in_tree_module_list = mod_list,
             boot_image_opts = boot_image_opts(
+                earlycon_addr = "qcom_geni,0x00884000",
                 kernel_vendor_cmdline_extras = kernel_vendor_cmdline_extras,
                 board_kernel_cmdline_extras = board_kernel_cmdline_extras,
                 board_bootconfig_extras = board_bootconfig_extras,
